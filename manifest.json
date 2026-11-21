@@ -1,0 +1,138 @@
+{
+  "version": "1.0.0",
+  "bridge": {
+    "routes": [
+      {
+        "name": "configure",
+        "params": {}
+      },
+      {
+        "name": "status",
+        "params": {}
+      },
+      {
+        "name": "event",
+        "params": {
+          "name": {
+            "type": "string",
+            "max": 40,
+            "required": true
+          },
+          "properties": {
+            "type": "string",
+            "max": 4096
+          },
+          "value": {
+            "type": "string",
+            "max": 32
+          }
+        }
+      },
+      {
+        "name": "purchase",
+        "params": {
+          "amount": {
+            "type": "string",
+            "max": 32,
+            "required": true
+          },
+          "currency": {
+            "type": "string",
+            "max": 3,
+            "required": true
+          },
+          "properties": {
+            "type": "string",
+            "max": 4096
+          }
+        }
+      },
+      {
+        "name": "flush",
+        "params": {}
+      },
+      {
+        "name": "user",
+        "params": {
+          "id": {
+            "type": "string",
+            "max": 256
+          }
+        }
+      },
+      {
+        "name": "consent",
+        "params": {
+          "enabled": {
+            "type": "bool",
+            "required": true
+          },
+          "advertiser_id": {
+            "type": "bool"
+          },
+          "automatic_events": {
+            "type": "bool"
+          }
+        }
+      },
+      {
+        "name": "activate",
+        "params": {}
+      }
+    ]
+  },
+  "ios": {
+    "packages": [
+      {
+        "name": "facebook-ios-sdk",
+        "remote": {
+          "url": "https://github.com/meta/facebook-ios-sdk",
+          "revision": "7c3fb7856063fa1074d330616f4070f2ed10a49b"
+        },
+        "products": [
+          "FacebookCore"
+        ]
+      }
+    ],
+    "package_resolved": "ios/Package.resolved",
+    "app": {
+      "entry_type": "MetaAdsExtension",
+      "sources": [
+        "ios/app/MetaAdsExtension.swift"
+      ],
+      "packages": [
+        "FacebookCore"
+      ],
+      "frameworks": [
+        "AppTrackingTransparency"
+      ],
+      "lifecycle": [
+        "launch"
+      ],
+      "info_plist": {
+        "FacebookAutoLogAppEventsEnabled": false,
+        "FacebookAdvertiserIDCollectionEnabled": false,
+        "FacebookAutoInitEnabled": false,
+        "FacebookAppID": "REPLACE_WITH_META_APP_ID",
+        "FacebookClientToken": "REPLACE_WITH_META_CLIENT_TOKEN",
+        "FacebookDisplayName": "Your app",
+        "SKAdNetworkItems": []
+      },
+      "custom_keys": true
+    }
+  },
+  "android": {
+    "entry_class": "despia.ext.metaads.MetaAdsExtension",
+    "lifecycle": [
+      "application_create"
+    ],
+    "modules": [
+      {
+        "kind": "custom",
+        "name": "metaads",
+        "dir": "android/metaads",
+        "link": "implementation"
+      }
+    ]
+  }
+}

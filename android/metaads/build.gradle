@@ -1,0 +1,16 @@
+apply plugin: 'com.android.library'
+android {
+    namespace 'despia.ext.metaads'
+    compileSdk 36
+    defaultConfig { minSdk 24 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20250517'
+    implementation project(':nativeext-api')
+    implementation 'com.facebook.android:facebook-core:19.0.1'
+}
