@@ -41,9 +41,11 @@ public final class MetaAdsExtension implements NativeExtension {
             }
             if (!configured) { reply.reply(ExtResult.error("not_configured", "Call configure first")); return; }
             if (call.route.equals("consent")) {
-                enabled = Boolean.TRUE.equals(call.params.get("enabled"));
-                FacebookSdk.setAutoLogAppEventsEnabled(enabled && Boolean.TRUE.equals(call.params.get("automatic_events")));
-                FacebookSdk.setAdvertiserIDCollectionEnabled(enabled && Boolean.TRUE.equals(call.params.get("advertiser_id")));
+                boolean requested = Boolean.TRUE.equals(call.params.get("enabled"));
+                if (requested) FacebookSdk.fullyInitialize();
+                FacebookSdk.setAutoLogAppEventsEnabled(requested && Boolean.TRUE.equals(call.params.get("automatic_events")));
+                FacebookSdk.setAdvertiserIDCollectionEnabled(requested && Boolean.TRUE.equals(call.params.get("advertiser_id")));
+                enabled = requested;
                 reply.reply(ExtResult.ok(answer(true, enabled))); return;
             }
             if (!enabled) { reply.reply(ExtResult.error("consent_required", "Enable event collection first")); return; }
