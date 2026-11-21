@@ -47,6 +47,7 @@ if (!configured?.ok) throw new Error(configured?.error ?? 'No native answer');
 const consentReply = await despia('extension://metaads/consent?enabled=true&advertiser_id=false&automatic_events=false', ['metaadsConsentResult']);
 const consent = consentReply.metaadsConsentResult;
 if (!consent?.ok) throw new Error(consent?.error ?? 'No native answer');
+if (!consent.data.enabled) throw new Error('Event collection is disabled');
 
 const activationReply = await despia('extension://metaads/activate', ['metaadsActivateResult']);
 const activation = activationReply.metaadsActivateResult;
@@ -63,7 +64,7 @@ if (!logged?.ok) throw new Error(logged?.error ?? 'No native answer');
 
 | Route | Parameters | Successful data | SDK output variable |
 | --- | --- | --- | --- |
-| configure | None | configured, enabled. Initializes once and leaves collection disabled. | `metaadsConfigureResult` |
+| configure | None | configured, enabled. iOS checks native configuration without starting the SDK; Android initializes with automatic collection off. | `metaadsConfigureResult` |
 | status | None | configured, enabled, sdk | `metaadsStatusResult` |
 | consent | enabled boolean required, advertiser_id and automatic_events optional booleans | iOS: enabled. Android: configured, enabled. Optional flags default false. | `metaadsConsentResult` |
 | activate | None | accepted: true. Logs app activation through Meta. | `metaadsActivateResult` |
@@ -77,6 +78,8 @@ Properties are a flat object with at most 25 entries, nonempty keys up to 40 cha
 ## ATT and attribution configuration
 
 This extension never presents ATT. Use the V3 trackingconsent:// call at your chosen moment. The prepared request/status callback API is a separate runtime change and must be released before it is used. Enable the existing tracking_usage purpose description in Despia and rebuild for ATT support. Existing app-configured NSUserTrackingUsageDescription takes priority. The runtime update under review also allows a required purpose description from the approved manifest when the app configuration has none.
+
+On iOS, configure checks that the native app ID and client token are present. It does not initialize or change the SDK. The first consent call with enabled=true starts the SDK using the approved Info.plist configuration, or reuses its matching existing instance. A different effective app ID or client token returns already_configured without changing that SDK's settings. A false choice before this extension has initialized or adopted the SDK leaves it unchanged. Explicit consent after that point changes the SDK's app-wide automatic event and advertiser ID settings. Android refuses an SDK already initialized by another integration.
 
 On iOS, advertiser_id=true enables collection only while ATT is authorized. The SDK reads ATT itself on iOS 17 and later. Enabling event collection is a separate decision from ATT. Turning this extension's collection off prevents its future bridge event calls and disables its automatic event and advertiser-id settings. It does not erase events already sent or guarantee cancellation of SDK work already in flight. Settings are process-local; reapply the app's stored choice after each launch.
 

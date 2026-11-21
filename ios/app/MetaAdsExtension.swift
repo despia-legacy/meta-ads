@@ -6,6 +6,7 @@ import AppTrackingTransparency
 final class MetaAdsExtension: NativeExtension {
     private var configured = false
     private var enabled = false
+    private var sdkReady = false
     required init() {}
     func didLaunch(_ context: NativeExtContext) {}
 
@@ -21,20 +22,24 @@ final class MetaAdsExtension: NativeExtension {
                 guard !appID.isEmpty, !token.isEmpty, !appID.hasPrefix("REPLACE_"), !token.hasPrefix("REPLACE_") else {
                     return .error(code: "not_configured", message: "Set FacebookAppID and FacebookClientToken before approval")
                 }
-                if let existing = Settings.shared.appID, existing != appID {
-                    return .error(code: "already_configured", message: "Another Meta app already owns this SDK")
-                }
-                Settings.shared.appID = appID
-                Settings.shared.clientToken = token
-                Settings.shared.isAutoLogAppEventsEnabled = false
-                Settings.shared.isAdvertiserIDCollectionEnabled = false
-                ApplicationDelegate.shared.initializeSDK()
                 configured = true
                 return .ok(["configured": true, "enabled": false])
             }
             guard configured else { return .error(code: "not_configured", message: "Call configure first") }
             if call.route == "consent" {
-                enabled = call.params["enabled"] as? Bool ?? false
+                guard call.isActive else { return .error(code: "timeout", message: "The consent request expired") }
+                let requested = call.params["enabled"] as? Bool ?? false
+                if !sdkReady {
+                    guard requested else { return .ok(["enabled": false]) }
+                    ApplicationDelegate.shared.initializeSDK()
+                    let appID = Bundle.main.object(forInfoDictionaryKey: "FacebookAppID") as? String
+                    let token = Bundle.main.object(forInfoDictionaryKey: "FacebookClientToken") as? String
+                    guard Settings.shared.appID == appID, Settings.shared.clientToken == token else {
+                        return .error(code: "already_configured", message: "Another Meta app configuration owns this SDK")
+                    }
+                    sdkReady = true
+                }
+                enabled = requested
                 Settings.shared.isAutoLogAppEventsEnabled = enabled && (call.params["automatic_events"] as? Bool ?? false)
                 let authorized = ATTrackingManager.trackingAuthorizationStatus == .authorized
                 Settings.shared.isAdvertiserIDCollectionEnabled = enabled && authorized && (call.params["advertiser_id"] as? Bool ?? false)
