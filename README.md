@@ -23,42 +23,54 @@ The Swift package is pinned to commit 7c3fb7856063fa1074d330616f4070f2ed10a49b. 
 
 ## JavaScript SDK
 
-Install the SDK in your web app:
+Install the published SDK in your web app:
 
 ```sh
 npm install despia-native
 ```
 
-Copy `example/src/lib/despia-extension.js` to your app's `src/lib/` and adjust the import path if needed. It imports `despia` from `despia-native`, calls the SDK and returns the native answer's `data`. It checks native error envelopes and throws an error with their `code`. The SDK itself resolves native `ok: false` envelopes; it does not reject them. A single watched value becomes `undefined` after 30 seconds, which this helper reports as `sdk_timeout`.
+Import `despia` directly from `despia-native`. The examples use SDK 1.0.28. Run native calls from browser event handlers or mounted client hooks; importing the SDK during server rendering is safe. The installed Despia V3 app must include the approved extension.
 
-Each helper call forwards a unique native callback into a separate watched value, so overlapping calls do not share response globals. `onExtensionEvent` registers the declared native event callbacks and returns a cleanup function. Events are callbacks, not values you can poll from the SDK proxy.
-
-Importing the SDK is safe during server rendering. Run calls and event subscriptions only from browser click handlers or mounted client hooks. React and Vue can use the browser APIs used by this helper; in Next.js and other server-rendered apps, keep these calls in client code. The extension must be included in the installed Despia V3 app; a browser preview has no native extension features.
+Pass the route's exact output variable as the second argument. The SDK resolves an object whose matching property contains the full native envelope: `ok`, `code`, `error` and `data`, with runtime metadata. A native `ok: false` answer does not reject the SDK promise. Check `ok` before reading `data`. A single watched value becomes `undefined` after 30 seconds without an answer. Await calls using the same output variable sequentially.
 
 ## Call from the page
 
+Apply the user's collection choice before sending events. Encode JSON query values with `encodeURIComponent(JSON.stringify(...))`.
+
 ```javascript
-import { extensionCall } from './lib/despia-extension.js';
-const meta = (route, params) => extensionCall('metaads', route, params);
-await meta('configure');
-// Apply the user's collection choice before logging events.
-await meta('consent', { enabled: true, advertiser_id: false, automatic_events: false });
-await meta('activate');
-await meta('event', { name: 'fb_mobile_complete_registration', properties: { registration_method: 'email' } });
+import despia from 'despia-native';
+
+const configuredReply = await despia('extension://metaads/configure', ['metaadsConfigureResult']);
+const configured = configuredReply.metaadsConfigureResult;
+if (!configured?.ok) throw new Error(configured?.error ?? 'No native answer');
+
+const consentReply = await despia('extension://metaads/consent?enabled=true&advertiser_id=false&automatic_events=false', ['metaadsConsentResult']);
+const consent = consentReply.metaadsConsentResult;
+if (!consent?.ok) throw new Error(consent?.error ?? 'No native answer');
+
+const activationReply = await despia('extension://metaads/activate', ['metaadsActivateResult']);
+const activation = activationReply.metaadsActivateResult;
+if (!activation?.ok) throw new Error(activation?.error ?? 'No native answer');
+
+const properties = { registration_method: 'email' };
+const loggedReply = await despia(
+  `extension://metaads/event?name=fb_mobile_complete_registration&properties=${encodeURIComponent(JSON.stringify(properties))}`,
+  ['metaadsEventResult']
+);
+const logged = loggedReply.metaadsEventResult;
+if (!logged?.ok) throw new Error(logged?.error ?? 'No native answer');
 ```
 
-Await each dependent operation. The helper checks the V3 result envelope before returning its data.
-
-| Route | Parameters | Successful data |
-| --- | --- | --- |
-| configure | None | configured, enabled. Initializes once and leaves collection disabled. |
-| status | None | configured, enabled, sdk |
-| consent | enabled boolean required, advertiser_id and automatic_events optional booleans | iOS: enabled. Android: configured, enabled. Optional flags default false. |
-| activate | None | accepted: true. Logs app activation through Meta. |
-| event | name required, optional properties JSON string, value numeric string | accepted: true |
-| purchase | amount numeric string and currency uppercase three-letter code required, optional properties JSON string | accepted: true |
-| user | Optional id, omit it to clear the SDK user id | accepted: true |
-| flush | None | accepted: true. Requests a flush, not a delivery receipt. |
+| Route | Parameters | Successful data | SDK output variable |
+| --- | --- | --- | --- |
+| configure | None | configured, enabled. Initializes once and leaves collection disabled. | `metaadsConfigureResult` |
+| status | None | configured, enabled, sdk | `metaadsStatusResult` |
+| consent | enabled boolean required, advertiser_id and automatic_events optional booleans | iOS: enabled. Android: configured, enabled. Optional flags default false. | `metaadsConsentResult` |
+| activate | None | accepted: true. Logs app activation through Meta. | `metaadsActivateResult` |
+| event | name required, optional properties JSON string, value numeric string | accepted: true | `metaadsEventResult` |
+| purchase | amount numeric string and currency uppercase three-letter code required, optional properties JSON string | accepted: true | `metaadsPurchaseResult` |
+| user | Optional id, omit it to clear the SDK user id | accepted: true | `metaadsUserResult` |
+| flush | None | accepted: true. Requests a flush, not a delivery receipt. | `metaadsFlushResult` |
 
 Properties are a flat object with at most 25 entries, nonempty keys up to 40 characters and string, number or boolean values. Name limits and parameter types are declared in manifest.json. Numbers must be finite. accepted means handed to the SDK, not received or attributed by Meta. Errors include not_configured, already_configured, consent_required and bad_request; Android can also return sdk_error. Unknown routes are rejected by the runtime before dispatch.
 
